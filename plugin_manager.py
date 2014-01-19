@@ -73,7 +73,9 @@ class PluginManager(object):
             else:
                 continue
             try:
+                print(name)
                 mod = __import__(name, globals(), locals(), [], 0)
+                print(mod)
                 for _, plugin in inspect.getmembers(mod, inspect.isclass):
                     if issubclass(plugin,
                                   self.base_class) and plugin is not self.base_class:
