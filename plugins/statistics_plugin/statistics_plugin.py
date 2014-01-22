@@ -1,25 +1,28 @@
 import logging
-from base_plugin import SimpleCommandPlugin
+from base_plugin import BasePlugin
 from core_plugins.player_manager import permissions, UserLevels
 
 from sqlalchemy.orm import Session
 
 from player_action import *
 
-class Statistics(SimpleCommandPlugin):
+from player_manager.manager import PlayerManager
+from packets import chat_send, warp_command
+
+class Statistics(BasePlugin):
     """
     A plugin that collects various statistics and saves them for later processing.
     """
     name = "statistics_plugin"
-    #commands = ["statistics"]
     auto_activate = True
     
     def activate(self):
         super(Statistics, self).activate()
-        print("in activate")
+        logging.info("Statistics plugin activates...")
         self.engine = create_engine('sqlite:///plugins/statistics_plugin/statistics.db')
         self.session = Session(self.engine)
-        
+        StatisticsBase.metadata.create_all(self.engine)
+        self.player_manager = PlayerManager(self.config)
 
     def deactivate(self):
         self.session.commit()
@@ -27,29 +30,44 @@ class Statistics(SimpleCommandPlugin):
         self.active = False
         return True
 
-    def after_chat_received(self, data):
-        """
-        Called after the chat_received packet is sent successfully.
-        :return : None
-        """
+    def after_client_connect(self, data):        
+        self.session.add(PlayerAction(
+            uuid=self.protocol.player.uuid,
+            action_type=ActionTypes.CONNECTED,
+            date_time=datetime.datetime.now()
+            )        
+        )
+        self.session.commit()
 
-    def after_chat_sent(self, data):
-        """
-        Called after the chat_sent packet is sent successfully.
-        :return : None
-        """
+    def after_client_disconnect(self, player):
+        self.session.add(PlayerAction(
+            uuid=player.uuid,
+            action_type=ActionTypes.DISCONNECTED,
+            date_time=datetime.datetime.now()
+            )        
+        )
+        self.session.commit()
 
-    def after_client_connect(self, data):
-        """
-        Called after the client_connect packet is sent successfully.
-        :return : None
-        """
+    def on_chat_sent(self, data):
+        chat_line = chat_send.parse(data.data).message
+        self.session.add(PlayerChatLine(
+            uuid=self.protocol.player.uuid,
+            date_time=datetime.datetime.now(),
+            line=chat_line
+            )        
+        )
+        self.session.commit()
 
-    def after_warp_command(self, data):
-        """
-        Called after the warp_command packet is sent successfully.
-        :return : None
-        """
+    def after_warp_command(self, data):        
+        warp = warp_command.parse(data.data)        
+        self.session.add(PlayerWarps(
+            uuid=self.protocol.player.uuid,
+            date_time=datetime.datetime.now(),
+            warp_type=warp.warp,
+            warp_target=warp.player
+            )
+        )
+        self.session.commit()
 
     def after_context_update(self, data):
         """
