@@ -1,0 +1,1 @@
+from statistics_plugin import Statistics
