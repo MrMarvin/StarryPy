@@ -46,6 +46,7 @@ class PluginManager(object):
         self.plugin_names = []
         self.config = ConfigurationManager()
         self.base_class = base_class
+        self.cached_hooks = {}
 
         self.core_plugin_dir = os.path.realpath(self.config.core_plugin_path)
         sys.path.append(self.core_plugin_dir)
@@ -115,7 +116,14 @@ class PluginManager(object):
         :rtype: bool
         """
         return_values = []
-        for plugin in self.plugins:
+        if not self.cached_hooks.has_key(command):
+            self.cached_hooks[command] = []
+            for plugin in self.plugins:
+                if hasattr(plugin,command):
+                    self.cached_hooks[command].append(plugin)
+            logging.debug("Cached plugins that hook to %s" % command)
+
+        for plugin in self.cached_hooks[command]:
             try:
                 if not plugin.active:
                     continue
@@ -127,6 +135,7 @@ class PluginManager(object):
             except Exception as e:
                 print "Error in plugin %s with function %s: %s" % (str(plugin), command, str(e))
         return all(return_values)
+
 
     def get_by_name(self, name):
         """
